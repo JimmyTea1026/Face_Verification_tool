@@ -4,14 +4,14 @@ import cv2
 from skimage import transform as trans
 
 class Scrfd:
-    def __init__(self, img_size, thresh, nms_thresh=0.3):
+    def __init__(self, det_size, thresh=0.3):
         self.conf_thresh = thresh
-        self.nms_thresh = nms_thresh
-        self.img_size = img_size
+        self.det_size = det_size
         self.initParm()
 
     def initParm(self):
         ##['score_8', 'score_16', 'score_32', 'bbox_8', 'bbox_16', 'bbox_32', 'kps_8', 'kps_16', 'kps_32']
+        self.nms_thresh = 0.3
         self.num_anchors = 2
         self.fmc = 3
         self.strides =[8,16,32]
@@ -19,29 +19,38 @@ class Scrfd:
     
     def preprocess(self, image): 
         '''
-        input : image(bgr), input_size
-        output : det_img(bgr)
+        input : image(bgr)
+        output : det_img(rgb) -> 1*3*640*640
+        
         Resize the image to match the input size proportionally,
-        then put the resized image into the left-top corner of the input size image and fill the rest with zeros.
+        normalize the image and put the resized image into the left-top corner of the input size image and fill the rest with zeros.
         '''
         image_ratio = image.shape[0] / image.shape[1]
-        input_ratio = self.img_size[1] / self.img_size[0] # h / w
+        input_ratio = self.det_size[1] / self.det_size[0] # h / w
 
         if image_ratio > input_ratio:
-            self.new_height = self.img_size[1]
+            self.new_height = self.det_size[1]
             self.new_width = int(self.new_height / image_ratio)
         else:
-            self.new_width = self.img_size[0]
+            self.new_width = self.det_size[0]
             self.new_height = int(self.new_width * image_ratio)
 
         self.det_scale = self.new_height / image.shape[0]
 
-        ###
+        # resize, convert to RGB and normalize
         resized_img = cv2.resize(image, (self.new_width, self.new_height))
-        det_img = np.zeros( (self.img_size[1], self.img_size[0], 3), dtype=np.uint8 ) # h,w
-        det_img[:self.new_height, :self.new_width, :] = resized_img
+        resized_img = cv2.cvtColor(resized_img, cv2.COLOR_BGR2RGB)
+        np_img = np.array(resized_img).astype(np.float32)
+        np_img = (np_img-127.5) / 128
+        
+        # fill the rest with zeros        
+        det_img = np.zeros( (self.det_size[1], self.det_size[0], 3), dtype=np.float32 ) # h,w
+        det_img[:self.new_height, :self.new_width, :] = np_img
 
-        return det_img
+        img_data = np.transpose(det_img, (2, 0, 1)) 
+        img_data = np.expand_dims(img_data, axis=0)
+
+        return img_data
     
     def clipCoord(self, results, img_shape):
         '''
@@ -137,8 +146,8 @@ class Scrfd:
             bbox_preds = outputs[idx + self.fmc][0] * stride
             kps_preds = outputs[idx + self.fmc * 2][0] * stride
 
-            h = self.img_size[1] // stride
-            w = self.img_size[0] // stride
+            h = self.det_size[1] // stride
+            w = self.det_size[0] // stride
 
             ##可寫入 初始化func,
             anchor_centers = np.stack(np.mgrid[:h, :w][::-1], axis=-1).astype(np.float32)
@@ -175,7 +184,7 @@ class Scrfd:
         bboxes = pre_det[keep, :]
         kpss = kpss[keep,:,:]
         if bboxes.shape[0] == 0:
-            return None, None
+            return None
 
         kpss = kpss.reshape((-1, 10))
 
@@ -183,9 +192,8 @@ class Scrfd:
         results = self.clipCoord(results, img.shape)
         
         face_infos = self.get_infos(results)
-        largest_face_info, largest_face = self.find_largest_face(img, face_infos)
 
-        return face_infos, largest_face
+        return face_infos
 
     def get_infos(self, det_result):
         face_infos = []
@@ -199,7 +207,7 @@ class Scrfd:
             
         return face_infos
     
-    def find_largest_face(self, frame, face_infos):
+    def find_largest_face(self, face_infos):
         '''
         Find the largest face from det_result,
         then align and crop the face from the frame.
@@ -209,51 +217,8 @@ class Scrfd:
         for face_info in face_infos:
             face_area.append(face_info['w'] * face_info['h'])
         largest_face_info = face_infos[np.argmax(face_area)]
-        largest_face = self.align_and_crops(frame, largest_face_info)
         
-        return largest_face_info, largest_face
-    
-    def estimate_norm(self, lmk, image_size=112):
-        arcface_src = np.array(
-                            [[[38.2946, 51.6963], [73.5318, 51.5014], [56.0252, 71.7366],
-                            [41.5493, 92.3655], [70.7299, 92.2041]]],
-                            dtype=np.float32)
-        lmk = lmk.reshape(5, 2)
-        tform = trans.SimilarityTransform()
-        lmk_tran = np.insert(lmk, 2, values=np.ones(5), axis=1)
-        min_M = []
-        min_index = []
-        min_error = float('inf')
-
-        if image_size == 112:
-            src = arcface_src
-        else:
-            src = float(image_size) / 112 * arcface_src
-
-        for i in np.arange(src.shape[0]):
-            tform.estimate(lmk, src[i])
-            M = tform.params[0:2, :]
-            results = np.dot(M, lmk_tran.T)
-            results = results.T
-            error = np.sum(np.sqrt(np.sum((results - src[i])**2, axis=1)))
-            if error < min_error:
-                min_error = error
-                min_M = M
-                min_index = i
-        return min_M, min_index
-
-    def crop_largest_face(self, img, largest_face_info, image_size=112):
-        landmark = [
-                    largest_face_info['right_eye'][0], largest_face_info['right_eye'][1],largest_face_info['left_eye'][0], largest_face_info['left_eye'][1],
-                    largest_face_info['nose'][0], largest_face_info['nose'][1],
-                    largest_face_info['right_mouth'][0], largest_face_info['right_mouth'][1],
-                    largest_face_info['left_mouth'][0], largest_face_info['left_mouth'][1]
-                    ]
-        landmark = np.array(landmark)
-        M, pose_index = self.estimate_norm(landmark, image_size)
-        warped = cv2.warpAffine(img, M, (image_size, image_size), borderValue=0.0)
-        return warped
-
+        return largest_face_info
     
     def align_and_crop(self, image, landmarks):
         """

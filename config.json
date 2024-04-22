@@ -1,5 +1,5 @@
 {
-    "face_size_min": 0.3,
-    "face_size_max": 0.5,
+    "face_size_min": 0.1,
+    "face_size_max": 0.25,
     "headpose_angle": 30
 }

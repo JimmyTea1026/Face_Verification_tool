@@ -1,10 +1,9 @@
 import os
 import numpy as np
 import cv2
-from skimage import transform as trans
 
 class Scrfd:
-    def __init__(self, det_size, thresh=0.3):
+    def __init__(self, det_size, thresh=0.5):
         self.conf_thresh = thresh
         self.det_size = det_size
         self.initParm()

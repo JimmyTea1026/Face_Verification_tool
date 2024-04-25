@@ -1,5 +1,11 @@
 {
-    "face_size_min": 0.1,
-    "face_size_max": 0.25,
-    "headpose_angle": 30
+    "face_size_min": 0.3,
+    "face_size_max": 0.6,
+    "pitch_limit": 5,
+    "yaw_limit": 5,
+    "roll_limit": 5,
+    "valid_area_x": 710,
+    "valid_area_y": 290,
+    "valid_area_h": 500,
+    "valid_area_w": 500
 }

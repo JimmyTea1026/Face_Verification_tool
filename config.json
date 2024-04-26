@@ -1,6 +1,6 @@
 {
     "img_size": [1920, 1080],
-    "output_image": "True",
+    "output_image": "False",
     "face_size_min": 0.03,
     "face_size_max": 0.06,
     "pitch_limit": 10,

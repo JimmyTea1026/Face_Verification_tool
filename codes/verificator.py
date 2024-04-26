@@ -1,3 +1,4 @@
+import os
 import sys
 import numpy as np  
 import cv2
@@ -14,14 +15,17 @@ class Verificator:
         self.detectors['mask'] = Mask_detector('./weights/mask.onnx')
         self.img_size = tuple(self.config['img_size'])
     
-    def verify(self, img:np.array)->dict:
+    def verify(self, img_path:str)->dict:
         '''
+        Return : 辨識結果(dict), 繪圖資訊(dict)
+        ------------------
         0. 有沒有臉
         1. 臉夠不夠大
         2. 臉有無正對鏡頭
         3. 口罩有無
         ------------------
         result = {
+                "error" : str -             Error message, default is None
                 "many_face" : boolean -     大於一個人臉
                 "face_detected": boolean -  有無偵測到人臉
                 "face_size": str -          臉夠不夠大 (small / good / big)
@@ -30,7 +34,13 @@ class Verificator:
                 "position": boolean -       臉有無處在畫面中央
                 }
         '''
-        result = {"many_face": False, "face_detected": False, "face_size": "", "with_mask": False, "headpose": False, "position": False}
+        result = {"error": None, "many_face": False, "face_detected": False, "face_size": "", "with_mask": False, "headpose": False, "position": False}
+        
+        if not os.path.isfile(img_path):
+            result['error'] = "File not found"
+            return result, None
+        
+        img = cv2.imread(img_path)
         img = cv2.resize(img, self.img_size)
                 
         face_infos = self.detectors['face'].detect(img)

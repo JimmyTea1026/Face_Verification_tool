@@ -77,31 +77,44 @@ def realtime_test(verificator):
         cv2.waitKey(1)
 
 def detect(verificator, config, img_path):
-    img = cv2.imread(img_path)
-    img = cv2.resize(img, (1920, 1080))
-    results, draw_info = verificator.verify(img)
+    img_name, _format = img_path.split('.')[-2], img_path.split('.')[-1]
+    output_name = f"./{img_name}_result.{_format}"
+
+    results, draw_info = verificator.verify(img_path)
     if config['output_image']:
+        img = cv2.imread(img_path)
+        img_size = tuple(config['img_size'])
+        img = cv2.resize(img, img_size)
         img = draw_frame(img, results, draw_info)
-        cv2.imwrite('./result.jpg', img)
-        
-    json_results = json.dumps(results)
-    return json_results
+        cv2.imwrite(output_name, img)
+
+    return results
 
 if __name__ == "__main__":
-    print("Activating")
+    print(json.dumps("Activated"))
     config_path='./config.json'
     
     if not os.path.isfile(config_path): 
-        sys.stderr.write('config file not found\n')
-    else:
-        with open(config_path, 'r') as f:
-            config = json.load(f)
-        verificator = Verificator(config)
-        # realtime_test(verificator)
-        for line in sys.stdin:
-            if line.strip() == 'exit':
-                break
-            img_path = line.strip()
-            json_results = detect(verificator, config, img_path)
-            print(json_results, file=sys.stdout)
+        msg = json.dumps('config file not found')
+        print(msg)
+        sys.exit()
+        
+    with open(config_path, 'r') as f:
+        config = json.load(f)
+    verificator = Verificator(config)
+    
+    # realtime_test(verificator)
+
+    for line in sys.stdin:
+        if line.strip() == 'exit':
+            sys.exit()
+        
+        json_input = line.strip()
+        input_data = json.loads(json_input)
+        _id, img_path = input_data['id'], input_data['img_path']
+        if os.path.isfile(img_path):
+            results = detect(verificator, config, img_path)
+            results['id'] = _id
+            json_results = json.dumps(results)
+            print(json_results)
             sys.stdout.flush()

@@ -1,26 +1,20 @@
-import json
+import sys
+import numpy as np  
+import cv2
 from .face_detector import Face_detector
 from .mask_detector import Mask_detector
 from .headpose_detector import Headpose_detector
 
 class Verificator:
-    def __init__(self, img_size, config_path) -> None:
-        self.img_size = img_size
-        self._initialization(config_path)
-    
-    def _initialization(self, config_path):
-        self.config = self._load_config(config_path)
+    def __init__(self, config) -> None:
+        self.config = config
         self.detectors = {'face': None, 'mask': None, 'headpose': None}
         self.detectors['face'] = Face_detector('./weights/scrfd.onnx')
         self.detectors['headpose'] = Headpose_detector('./weights/headpose.onnx')
         self.detectors['mask'] = Mask_detector('./weights/mask.onnx')
+        self.img_size = tuple(self.config['img_size'])
     
-    def _load_config(self, config_path):
-        with open(config_path, 'r') as f:
-            config = json.load(f)
-        return config
-    
-    def verify(self, img):
+    def verify(self, img:np.array)->dict:
         '''
         0. 有沒有臉
         1. 臉夠不夠大
@@ -28,41 +22,51 @@ class Verificator:
         3. 口罩有無
         ------------------
         result = {
+                "many_face" : boolean -     大於一個人臉
                 "face_detected": boolean -  有無偵測到人臉
-                "many_face" : boolean - 大於一個人臉
                 "face_size": str -          臉夠不夠大 (small / good / big)
-                "no_mask": boolean -       有無戴口罩
+                "with_mask": boolean -      有無戴口罩
                 "headpose": boolean -       臉有無正對鏡頭
+                "position": boolean -       臉有無處在畫面中央
                 }
         '''
-        result = {"face_detected": False, "many_face": False, "face_size": None, "no_mask": False, "headpose": False}
-        if (img.shape[1], img.shape[0]) != self.img_size:   # 輸入圖片大小不符合，raise error
-            raise ValueError(f"Image size must be {self.img_size}")
-        
+        result = {"many_face": False, "face_detected": False, "face_size": "", "with_mask": False, "headpose": False, "position": False}
+        img = cv2.resize(img, self.img_size)
+                
         face_infos = self.detectors['face'].detect(img)
         
         if len(face_infos) == 1:    # 只有一個人臉才做後續偵測
             face_info = face_infos[0]
+            draw_info = {"face_info": "", "face_size_info": "", 
+                "headpose_info": "", "mask_info": "", "position": ""}
+            
+            draw_info['face_info'] = face_info
             result["face_detected"] = True
             
             face_size_result, face_size_info = self._face_size_verify(img.copy(), face_info)
             result["face_size"] = face_size_result
+            draw_info[f"face_size_info"] = face_size_info
             
             headpose_result, headpose_info = self._headpose_verify(img, face_info)
             result["headpose"] = headpose_result
+            draw_info["headpose_info"] = headpose_info
             
-            mask_result, mask_info = self._mask_verify(img, face_info)
-            result["no_mask"] = mask_result
+            position_result, position_info = self._check_face_position(face_info)
+            result['position'] = position_result
+            draw_info['position_info'] = str(position_info)
             
-            position_result = self._check_face_position(face_info)
+            if headpose_result: # 因為側臉會讓口罩偵測失準，只有正對鏡頭才做口罩偵測
+                mask_result, mask_info = self._mask_verify(img, face_info)
+                result["with_mask"] = mask_result
+                draw_info["mask_info"] = mask_info
         
-            draw_info = {"face_info": face_info, "face_size_info": face_size_info, "headpose_info": headpose_info, "mask_info": mask_info}
             return result, draw_info
         
-        elif len(face_infos) > 1:   # 多於一個人臉
-            result["many_face"] = True
+        else:
+            if len(face_infos) > 1:   # 多於一個人臉
+                result["many_face"] = True
 
-        return result, None
+            return result, None
     
     def _face_size_verify(self, img, face_info):
         '''
@@ -101,10 +105,11 @@ class Verificator:
         face = img[y:y+h, x:x+w]
         mask_result, posibility = self.detectors['mask'].detect(face)
         mask_info = f"{mask_result} : {posibility}%"
+        
         if mask_result == 'Mask':
-            return False, mask_info
-        else:
             return True, mask_info
+        else:
+            return False, mask_info
 
     def _check_face_position(self, face_info):
         def calculate_iou(box1, box2):
@@ -125,5 +130,9 @@ class Verificator:
         box2 = [self.config['valid_area_x'], self.config['valid_area_y'], 
                 self.config['valid_area_x']+self.config['valid_area_w'], self.config['valid_area_y']+self.config['valid_area_h']]
         iou = calculate_iou(box1, box2)
-        print("IOU between box1 and box2:", iou)
-        return 
+        iou = round(iou, 2)
+        
+        if iou > self.config['iou_limit']:
+            return True, iou  
+        else:
+            return False, iou

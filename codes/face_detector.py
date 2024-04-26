@@ -23,6 +23,7 @@ class Face_detector:
         session = ort.InferenceSession(self.model.SerializeToString())
         original_inf_results = session.run(None, {'data': img_preprocessed})
         face_infos = self.scrfd.postprocess(original_inf_results, img)
+        
         if face_infos is None: face_infos = []
         return face_infos
     

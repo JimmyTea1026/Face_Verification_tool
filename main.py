@@ -2,6 +2,8 @@ import math
 import os 
 import cv2
 import numpy as np
+import sys
+import json
 from codes.verificator import Verificator
 
 def draw_frame(frame, results, draw_info):
@@ -9,10 +11,11 @@ def draw_frame(frame, results, draw_info):
         face_info = draw_info['face_info']
         headpose_info = draw_info['headpose_info']
         face_size_info = draw_info['face_size_info']
+        position_info = draw_info['position_info']
         mask_info = draw_info['mask_info']
         #------------------------------------
-        face_size, mask, headpose = results['face_size'], results['no_mask'], results['headpose']
-        cv2.putText(frame, f"size:{face_size} / no_mask:{mask} / headpose:{headpose}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0), 1)
+        face_size, mask, headpose = results['face_size'], results['with_mask'], results['headpose']
+        cv2.putText(frame, f"size:{face_size} / with_mask:{mask} / headpose:{headpose}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0), 2)
         #------------------------------------
         cv2.rectangle(frame, (face_info['x'], face_info['y']), (face_info['x'] + face_info['w'], face_info['y'] + face_info['h']), (0, 255, 0), 2)
         cv2.circle(frame, face_info['left_eye'], 2, (255, 0, 0), 2)
@@ -22,9 +25,11 @@ def draw_frame(frame, results, draw_info):
         cv2.circle(frame, face_info['right_mouth'], 2, (0, 255, 255), 2)
         cv2.putText(frame, f"conf : {face_info['confidence']:.3f}", (face_info['x']-10, face_info['y'] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,255,0), 2)
         #------------------------------------
-        cv2.putText(frame, f"size : {int(face_size_info)}%", (face_info['x']-10, face_info['y'] + face_info['h'] + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 2)
+        cv2.putText(frame, f"size : {int(face_size_info)}%", (face_info['x']-10, face_info['y'] + face_info['h'] + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0), 2)
         v_x, v_y, v_w, v_h = 710, 290, 500, 500
         cv2.rectangle(frame, (v_x, v_y), (v_x + v_w, v_y + v_h), (255, 255, 255), 2)
+        #------------------------------------
+        cv2.putText(frame, f"IOU : {position_info}%", (face_info['x']-10, face_info['y'] + face_info['h'] + 100), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 2)
         #------------------------------------
         cv2.putText(frame, mask_info, (face_info['x']-10, face_info['y'] + face_info['h'] + 0), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,0,255), 2)
         #------------------------------------
@@ -65,21 +70,38 @@ def realtime_test(verificator):
         ret, frame = cap.read()
         if not ret:
             break
-        img = cv2.resize(frame, img_size)
-        results, draw_info = verificator.verify(img)  
-        img = draw_frame(img, results, draw_info)
+        frame = cv2.resize(frame, (1920, 1080))
+        results, draw_info = verificator.verify(frame)  
+        img = draw_frame(frame, results, draw_info)
         cv2.imshow('frame', img)
         cv2.waitKey(1)
 
-def img_test(verificator, img_path):
+def detect(verificator, config, img_path):
     img = cv2.imread(img_path)
+    img = cv2.resize(img, (1920, 1080))
     results, draw_info = verificator.verify(img)
-    img = draw_frame(img, results, draw_info)
-    cv2.imshow('frame', img)
+    if config['output_image']:
+        img = draw_frame(img, results, draw_info)
+        cv2.imwrite('./result.jpg', img)
+        
+    json_results = json.dumps(results)
+    return json_results
 
 if __name__ == "__main__":
-    img_size = (1920, 1080) 
-    verificator = Verificator(img_size, config_path='./config.json')
-
-    realtime_test(verificator)
-    # img_test(verificator, './test.jpg')
+    print("Activating")
+    config_path='./config.json'
+    
+    if not os.path.isfile(config_path): 
+        sys.stderr.write('config file not found\n')
+    else:
+        with open(config_path, 'r') as f:
+            config = json.load(f)
+        verificator = Verificator(config)
+        # realtime_test(verificator)
+        for line in sys.stdin:
+            if line.strip() == 'exit':
+                break
+            img_path = line.strip()
+            json_results = detect(verificator, config, img_path)
+            print(json_results, file=sys.stdout)
+            sys.stdout.flush()

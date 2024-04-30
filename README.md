@@ -56,6 +56,6 @@ Default :
 ---
 ## Note
 - 當臉沒有正對鏡頭時，不會偵測口罩。 (臉歪斜時，口罩偵測效果差)
-![image](https://hackmd.io/_uploads/HySIT2nbR.png)
+- ![image](https://hackmd.io/_uploads/HySIT2nbR.png)
 使用時可能會有 onnx 的stderr跳出，需要特別處理
 

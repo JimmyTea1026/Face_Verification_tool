@@ -1,7 +1,5 @@
-import math
 import os 
 import cv2
-import numpy as np
 import sys
 import json
 from codes.verificator import Verificator
@@ -40,8 +38,8 @@ def img_verify(verificator, config):
                 print(json_results)
                 sys.stdout.flush()
                 if config['save_img'] == "True":
-                    output_name = f"./result.jpg"
-                    cv2.imwrite(output_name, drawed_img)
+                    save_path = config['save_path']
+                    cv2.imwrite(save_path, drawed_img)
         except:
             print(json.dumps({"error": "Image file not found"}))
             sys.stdout.flush()
@@ -80,5 +78,5 @@ if __name__ == "__main__":
         config = json.load(f)
     verificator = Verificator(config)
 
-    # realtime_test(verificator)
-    img_verify(verificator, config)
+    realtime_test(verificator)
+    # img_verify(verificator, config)

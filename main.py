@@ -6,62 +6,6 @@ import sys
 import json
 from codes.verificator import Verificator
 
-def draw_frame(frame, results, draw_info):
-    if draw_info is not None:
-        face_info = draw_info['face_info']
-        headpose_info = draw_info['headpose_info']
-        face_size_info = draw_info['face_size_info']
-        position_info = draw_info['position_info']
-        mask_info = draw_info['mask_info']
-        #------------------------------------
-        face_size, mask, headpose = results['face_size'], results['with_mask'], results['headpose']
-        cv2.putText(frame, f"size:{face_size} / with_mask:{mask} / headpose:{headpose}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0), 2)
-        #------------------------------------
-        cv2.rectangle(frame, (face_info['x'], face_info['y']), (face_info['x'] + face_info['w'], face_info['y'] + face_info['h']), (0, 255, 0), 2)
-        cv2.circle(frame, face_info['left_eye'], 2, (255, 0, 0), 2)
-        cv2.circle(frame, face_info['right_eye'], 2, (0, 0, 255), 2)
-        cv2.circle(frame, face_info['nose'], 2, (0, 255, 0), 2)
-        cv2.circle(frame, face_info['left_mouth'], 2, (255, 0, 255), 2)
-        cv2.circle(frame, face_info['right_mouth'], 2, (0, 255, 255), 2)
-        cv2.putText(frame, f"conf : {face_info['confidence']:.3f}", (face_info['x']-10, face_info['y'] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,255,0), 2)
-        #------------------------------------
-        cv2.putText(frame, f"size : {int(face_size_info)}%", (face_info['x']-10, face_info['y'] + face_info['h'] + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0), 2)
-        v_x, v_y, v_w, v_h = 710, 290, 500, 500
-        cv2.rectangle(frame, (v_x, v_y), (v_x + v_w, v_y + v_h), (255, 255, 255), 2)
-        #------------------------------------
-        cv2.putText(frame, f"IOU : {position_info}%", (face_info['x']-10, face_info['y'] + face_info['h'] + 100), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 2)
-        #------------------------------------
-        cv2.putText(frame, mask_info, (face_info['x']-10, face_info['y'] + face_info['h'] + 0), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,0,255), 2)
-        #------------------------------------
-        pitch, yaw, roll = headpose_info['pitch'], headpose_info['yaw'], headpose_info['roll']
-        cv2.putText(frame, f"pitch : {(pitch):.1f}", (face_info['x']-10, face_info['y'] + face_info['h'] + 40), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,255), 2)
-        cv2.putText(frame, f"yaw : {(yaw):.1f}", (face_info['x']-10, face_info['y'] + face_info['h'] + 60), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,255,0), 2)
-        cv2.putText(frame, f"roll : {(roll):.1f}", (face_info['x']-10, face_info['y'] + face_info['h'] + 80), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,0,0), 2)
-        pitch = pitch * np.pi / 180
-        yaw = -(yaw * np.pi / 180)
-        roll = roll * np.pi / 180
-
-        tdx = face_info['nose'][0]
-        tdy = face_info['nose'][1]
-        size = 100
-        # X-Axis pointing to right. drawn in red
-        x1 = size * (math.cos(yaw) * math.cos(roll)) + tdx
-        y1 = size * (math.cos(pitch) * math.sin(roll) + math.cos(roll) * math.sin(pitch) * math.sin(yaw)) + tdy
-
-        # Y-Axis | drawn in green
-        x2 = size * (-math.cos(yaw) * math.sin(roll)) + tdx
-        y2 = size * (math.cos(pitch) * math.cos(roll) - math.sin(pitch) * math.sin(yaw) * math.sin(roll)) + tdy
-
-        # Z-Axis (out of the screen) drawn in blue
-        x3 = size * (math.sin(yaw)) + tdx
-        y3 = size * (-math.cos(yaw) * math.sin(pitch)) + tdy
-
-        cv2.line(frame, (int(tdx), int(tdy)), (int(x1),int(y1)),(0,0,255),4)
-        cv2.line(frame, (int(tdx), int(tdy)), (int(x2),int(y2)),(0,255,0),4)
-        cv2.line(frame, (int(tdx), int(tdy)), (int(x3),int(y3)),(255,0,0),4)
-        
-    return frame
-
 def realtime_test(verificator):
     cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
@@ -71,50 +15,70 @@ def realtime_test(verificator):
         if not ret:
             break
         frame = cv2.resize(frame, (1920, 1080))
-        results, draw_info = verificator.verify(frame)  
-        img = draw_frame(frame, results, draw_info)
-        cv2.imshow('frame', img)
+        results, drawed_img = verificator.verify(frame, with_mask=True)  
+        r = postprocess(results, 0)
+        print(json.dumps(r))
+        cv2.imshow('frame', drawed_img)
         cv2.waitKey(1)
 
-def detect(verificator, config, img_path):
-    img_name, _format = img_path.split('.')[-2], img_path.split('.')[-1]
-    output_name = f"./{img_name}_result.{_format}"
+def img_verify(verificator, config):
+    print(json.dumps("Activated"))
+    sys.stdout.flush()
+    
+    for line in sys.stdin:
+        if line.strip() == 'exit':
+            sys.exit()
 
-    results, draw_info = verificator.verify(img_path)
-    if config['output_image']:
-        img = cv2.imread(img_path)
-        img_size = tuple(config['img_size'])
-        img = cv2.resize(img, img_size)
-        img = draw_frame(img, results, draw_info)
-        cv2.imwrite(output_name, img)
+        input_data = json.loads(line.strip())
+        _id, img_path, with_mask = input_data['id'], input_data['img_path'], input_data['with_mask']
+        
+        try:
+            if os.path.isfile(img_path):
+                verify_results, drawed_img = verificator.verify(img_path, with_mask)
+                results = postprocess(verify_results, _id)                
+                json_results = json.dumps(results)
+                print(json_results)
+                sys.stdout.flush()
+                if config['save_img'] == "True":
+                    output_name = f"./result.jpg"
+                    cv2.imwrite(output_name, drawed_img)
+        except:
+            print(json.dumps({"error": "Image file not found"}))
+            sys.stdout.flush()
 
+def postprocess(verify_results, _id):
+    '''
+    result = {
+                "put_off_mask": boolean -  True代表需要拿下口罩
+                "put_on_mask": boolean -   True代表需要戴上口罩
+                "many_face": boolean -     True代表偵測到多於一個人臉
+                "small_face": boolean -    臉太小，True代表太小
+                "big_face": boolean -      臉太大，True代表太大
+                "headpose": boolean -      臉有無正對鏡頭，True代表沒有正對鏡頭
+                "no_face": boolean -       沒有偵測到人臉，True代表沒有偵測到人臉
+                "position": boolean -      臉有無處在畫面中央，True代表沒有處在畫面中央
+                }
+    '''
+    error_type = {'put_off_mask': 0, 'put_on_mask': 1, 'many_face': 2, 'small_face': 3, 'big_face': 4, 'headpose': 5, 'no_face': 6, 'position': 7}
+    results = {'id': None, 'result': []}
+    results['id'] = _id
+    for key, value in verify_results.items():
+        if value == True:
+            results['result'].append(error_type[key])
+    
     return results
 
 if __name__ == "__main__":
-    print(json.dumps("Activated"))
-    config_path='./config.json'
+    config_path='./config/verify_config.json'
     
     if not os.path.isfile(config_path): 
-        msg = json.dumps('config file not found')
+        msg = json.dumps({"error": "Config file not found"})
         print(msg)
         sys.exit()
         
     with open(config_path, 'r') as f:
         config = json.load(f)
     verificator = Verificator(config)
-    
-    # realtime_test(verificator)
 
-    for line in sys.stdin:
-        if line.strip() == 'exit':
-            sys.exit()
-        
-        json_input = line.strip()
-        input_data = json.loads(json_input)
-        _id, img_path = input_data['id'], input_data['img_path']
-        if os.path.isfile(img_path):
-            results = detect(verificator, config, img_path)
-            results['id'] = _id
-            json_results = json.dumps(results)
-            print(json_results)
-            sys.stdout.flush()
+    realtime_test(verificator)
+    # img_verify(verificator, config)

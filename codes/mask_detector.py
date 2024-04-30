@@ -21,7 +21,5 @@ class Mask_detector:
         result = ort_session.run(None, {'input_1': data_face})
         result = np.squeeze(result)
         mask, withoutMask = result[0], result[1]
-        label = "Mask" if mask > withoutMask else "No Mask"
-        posibility = round(max(mask, withoutMask) * 100, 1)
         
-        return label, posibility
+        return mask, withoutMask

@@ -80,5 +80,5 @@ if __name__ == "__main__":
         config = json.load(f)
     verificator = Verificator(config)
 
-    realtime_test(verificator)
-    # img_verify(verificator, config)
+    # realtime_test(verificator)
+    img_verify(verificator, config)

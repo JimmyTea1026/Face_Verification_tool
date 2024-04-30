@@ -2,3 +2,5 @@
 /test
 /dist
 /build
+weights/
+*.jpg

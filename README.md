@@ -1,4 +1,4 @@
-# Guide
+# App : Face verification 
 
 ## How to use
 **input_form** : (json)
@@ -48,7 +48,14 @@ Default :
 **Debug用，開啟後會在當下目錄存下輸入影像的各種資訊，用於調整參數**
 
 ---
+## exe generate
+1. `pip install pyinstaller`
+2. cd 至 main.py所在目錄
+3. `pyinstaller -F main.py`
+4. 執行後會生成 dist, build 兩個資料夾，exe檔在dist內
+---
 ## Note
+- 當臉沒有正對鏡頭時，不會偵測口罩。 (臉歪斜時，口罩偵測效果差)
 ![image](https://hackmd.io/_uploads/HySIT2nbR.png)
 使用時可能會有 onnx 的stderr跳出，需要特別處理
 

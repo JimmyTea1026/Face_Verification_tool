@@ -31,7 +31,7 @@ def img_verify(verificator):
         
         try:
             if os.path.isfile(img_path):
-                verify_results, drawed_img = verificator.verify(img_path, with_mask)
+                verify_results, _ = verificator.verify(img_path, with_mask)
                 results = postprocess(verify_results, _id)                
                 json_results = json.dumps(results)
                 print(json_results)
@@ -76,12 +76,7 @@ def postprocess(verify_results, _id):
 if __name__ == "__main__":
     config_path='./config/verify_config.json'
     
-    if not os.path.isfile(config_path): 
-        msg = json.dumps({"error": "Config file not found"})
-        print(msg)
-        sys.exit()
-
     verificator = Verificator(config_path)
     # test(verificator)
-    realtime_test(verificator)
-    # img_verify(verificator, config)
+    # realtime_test(verificator)
+    img_verify(verificator)

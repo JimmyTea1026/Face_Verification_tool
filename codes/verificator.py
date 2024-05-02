@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 import cv2
 import math
 import numpy as np
@@ -72,6 +73,11 @@ class Verificator:
     
     def _load_config(self):
         # load json config
+        if not os.path.isfile(self.config_path): 
+            msg = json.dumps({"error": "Config file not found"})
+            print(msg)
+            sys.exit()
+            
         with open(self.config_path) as file:
             config = json.load(file)
         self.config = config
@@ -133,12 +139,13 @@ class Verificator:
             result['position'] = position_result
             draw_info['position_info'] = str(position_info)
             
-            mask_result, mask_info = self._mask_verify(img, face_info)
-            draw_info["mask_info"] = mask_info
-            if with_mask==True and mask_result==False:
-                result["put_on_mask"] = True
-            elif with_mask==False and mask_result==True:
-                result["put_off_mask"] = True
+            if not headpose_result:
+                mask_result, mask_info = self._mask_verify(img, face_info)
+                draw_info["mask_info"] = mask_info
+                if with_mask==True and mask_result==False:
+                    result["put_on_mask"] = True
+                elif with_mask==False and mask_result==True:
+                    result["put_off_mask"] = True
 
             img = draw_frame(img, draw_info)
             if self.config['save_img']:

@@ -18,7 +18,7 @@ def main():
 
 
     # 主線程繼續執行其他任務
-    img_path = "D:\\Compal\\Code\\face verification\\test\\3.jpg"
+    img_path = "D:\\Compal\\Code\\face verification\\test\\1.jpg"
     input_data = {"id": 0, "img_path": img_path, "with_mask": False}
     json_input = json.dumps(input_data)
     process.stdin.write(json_input + '\n')

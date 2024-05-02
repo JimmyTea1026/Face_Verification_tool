@@ -6,20 +6,19 @@ from codes.verificator import Verificator
 
 def realtime_test(verificator):
     cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
+
     while True:
         ret, frame = cap.read()
         if not ret:
             break
-        frame = cv2.resize(frame, (1920, 1080))
         results, drawed_img = verificator.verify(frame, with_mask=True)  
         r = postprocess(results, 0)
         print(json.dumps(r))
+        drawed_img = cv2.resize(drawed_img, (640, 480))
         cv2.imshow('frame', drawed_img)
         cv2.waitKey(1)
 
-def img_verify(verificator, config):
+def img_verify(verificator):
     print(json.dumps("Activated"))
     sys.stdout.flush()
     
@@ -37,12 +36,20 @@ def img_verify(verificator, config):
                 json_results = json.dumps(results)
                 print(json_results)
                 sys.stdout.flush()
-                if config['save_img'] == "True":
-                    save_path = config['save_path']
-                    cv2.imwrite(save_path, drawed_img)
         except:
             print(json.dumps({"error": "Image file not found"}))
             sys.stdout.flush()
+
+def test(verificator):
+    _id = 0
+    img_path = "D:\\Compal\\Code\\face verification\\test\\2.jpg"
+    with_mask = False
+    verify_results, drawed_img = verificator.verify(img_path, with_mask)
+    results = postprocess(verify_results, _id)                
+    json_results = json.dumps(results)
+    print(json_results)
+    save_path = "D:\\Compal\\Code\\face verification\\test\\result.jpg"
+    cv2.imwrite(save_path, drawed_img)
 
 def postprocess(verify_results, _id):
     '''
@@ -73,10 +80,8 @@ if __name__ == "__main__":
         msg = json.dumps({"error": "Config file not found"})
         print(msg)
         sys.exit()
-        
-    with open(config_path, 'r') as f:
-        config = json.load(f)
-    verificator = Verificator(config)
 
+    verificator = Verificator(config_path)
+    # test(verificator)
     realtime_test(verificator)
     # img_verify(verificator, config)

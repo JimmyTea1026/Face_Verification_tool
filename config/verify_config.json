@@ -1,10 +1,11 @@
 {
     "img_size": [1920, 1080],
     "face_size_min": 0.03,  
-    "face_size_max": 0.015,
-    "pitch_limit": 7,
+    "face_size_max": 0.15,
+    "pitch_limit": 8,
     "yaw_limit": 10,
     "roll_limit": 10,
+    "mask_limit": 0.6,
     "valid_area_x": 710,
     "valid_area_y": 290,
     "valid_area_h": 500,

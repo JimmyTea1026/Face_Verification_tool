@@ -3,7 +3,7 @@ import numpy as np
 import cv2
 
 class Scrfd:
-    def __init__(self, det_size, thresh=0.5):
+    def __init__(self, det_size, thresh=0.6):
         self.conf_thresh = thresh
         self.det_size = det_size
         self.initParm()

@@ -1,3 +1,4 @@
+import json
 import os
 import cv2
 import math
@@ -6,7 +7,7 @@ from .face_detector import Face_detector
 from .mask_detector import Mask_detector
 from .headpose_detector import Headpose_detector
 
-def draw_frame(frame, results, draw_info):
+def draw_frame(frame, draw_info):
     if draw_info is not None:
         face_info = draw_info['face_info']
         headpose_info = draw_info['headpose_info']
@@ -28,7 +29,7 @@ def draw_frame(frame, results, draw_info):
         #------------------------------------
         cv2.putText(frame, f"IOU : {position_info}%", (face_info['x']-10, face_info['y'] + face_info['h'] + 100), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 2)
         #------------------------------------
-        cv2.putText(frame, mask_info, (face_info['x']-10, face_info['y'] + face_info['h'] + 0), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,0,255), 2)
+        cv2.putText(frame, mask_info, (face_info['x']-10, face_info['y'] + face_info['h'] + 0), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 2)
         #------------------------------------
         pitch, yaw, roll = headpose_info['pitch'], headpose_info['yaw'], headpose_info['roll']
         cv2.putText(frame, f"pitch : {(pitch):.1f}", (face_info['x']-10, face_info['y'] + face_info['h'] + 40), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,255), 2)
@@ -60,13 +61,20 @@ def draw_frame(frame, results, draw_info):
     return frame
 
 class Verificator:
-    def __init__(self, config) -> None:
-        self.config = config
+    def __init__(self, config_path) -> None:
+        self.config_path = config_path
+        self._load_config()
         self.detectors = {'face': None, 'mask': None, 'headpose': None}
         self.detectors['face'] = Face_detector('./weights/scrfd.onnx')
         self.detectors['headpose'] = Headpose_detector('./weights/headpose.onnx')
         self.detectors['mask'] = Mask_detector('./weights/mask.onnx')
         self.img_size = tuple(self.config['img_size'])
+    
+    def _load_config(self):
+        # load json config
+        with open(self.config_path) as file:
+            config = json.load(file)
+        self.config = config
     
     def _preprocess(self, img):
         if type(img) == str:
@@ -89,6 +97,8 @@ class Verificator:
                 "position": boolean -      臉有無處在畫面中央，True代表沒有處在畫面中央
                 }
         '''
+        self._load_config()
+        
         result = {'put_off_mask': False, 'put_on_mask': False, 'many_face': False, 'small_face': False, 'big_face': False, 'headpose': False, 'no_face': False, 'position': False}
         
         img = self._preprocess(img)
@@ -123,15 +133,16 @@ class Verificator:
             result['position'] = position_result
             draw_info['position_info'] = str(position_info)
             
-            if not headpose_result: # 因為側臉會讓口罩偵測失準，只有正對鏡頭才做口罩偵測
-                mask_result, mask_info = self._mask_verify(img, face_info)
-                draw_info["mask_info"] = mask_info
-                if with_mask==True and mask_result==False:
-                    result["put_on_mask"] = True
-                elif with_mask==False and mask_result==True:
-                    result["put_off_mask"] = True
+            mask_result, mask_info = self._mask_verify(img, face_info)
+            draw_info["mask_info"] = mask_info
+            if with_mask==True and mask_result==False:
+                result["put_on_mask"] = True
+            elif with_mask==False and mask_result==True:
+                result["put_off_mask"] = True
 
-            img = draw_frame(img, result, draw_info)
+            img = draw_frame(img, draw_info)
+            if self.config['save_img']:
+                cv2.imwrite(self.config['save_path'], img)
         
         return result, img
     
@@ -172,7 +183,8 @@ class Verificator:
         face = img[y:y+h, x:x+w]
         mask, withoutMask = self.detectors['mask'].detect(face)
         
-        if mask > 0.7:
+        # print(round(mask*100, 1), round(withoutMask*100, 1))
+        if mask > self.config['mask_limit']:
             return True, f"Mask : {mask*100:.1f}%"
         else:
             return False, f"Without Mask : {withoutMask*100:.1f}%"

@@ -5,3 +5,6 @@
 weights/
 *.jpg
 *.rar
+/Face-Mask-Detection/
+*.exe
+*.spec

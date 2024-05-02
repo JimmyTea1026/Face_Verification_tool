@@ -10,10 +10,16 @@ class Mask_detector:
     def _preprocess(self, face):
         face_rgb = cv2.cvtColor(face, cv2.COLOR_BGR2RGB)
         face_resized = cv2.resize(face_rgb, (224, 224))
-        np_face = np.array(face_resized).astype(np.float32)
-        preprocessed_face = np_face / 255.0
-        data_face = np.expand_dims(preprocessed_face, axis=0)
+        norm_face = self._normalize(face_resized).astype(np.float32)
+        data_face = np.expand_dims(norm_face, axis=0)
         return data_face
+    
+    def _normalize(self, face):
+        # Normalize the image with imagenet mean and std
+        mean = np.array([0.485, 0.456, 0.406])
+        std = np.array([0.229, 0.224, 0.225])
+        norm_face = (face / 255 - mean) / std
+        return norm_face
     
     def detect(self, face):
         data_face = self._preprocess(face)
